@@ -12,11 +12,13 @@ model = cv2.dnn.readNet("./dnn/yolov3.weights", "./dnn/yolov3.cfg")
 layer_names = model.getLayerNames()
 output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
 #output_layers = [layer_names[i[0] - 1] for i in model.getUnconnectedOutLayers()]
-#output_layers = ['yolo_82', 'yolo_94', 'yolo_106']
 
-video = cv2.VideoCapture('./video/Seoul_Traffic.mp4')
+# video = cv2.VideoCapture('./video/Seoul_Traffic.mp4')
+video = cv2.VideoCapture(0)
+video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-CONF_THR = 0.5
+CONF_THR = 0.6
 prev_time = 0
 FPS = 10
 
@@ -47,7 +49,7 @@ while(video.isOpened()):
             class_id = np.argmax(scores)
             conf = scores[class_id]
 
-            if conf > CONF_THR:     # 임계치 0.5
+            if class_id < 12 and conf > CONF_THR:     # 임계치 0.5
                 center_x = int(detection[0] * iw)
                 center_y = int(detection[1] * ih)
                 w = int(detection[2] * iw)
@@ -68,8 +70,10 @@ while(video.isOpened()):
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             color = colors[i]
+            cv2.line(img, (x, y), (x, y), color, 10)
+            cv2.line(img, (x + w, y + h), (x + w, y + h), color, 10)
             cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(img, label, (x, y + 30), font, 3, color, 3)
+            cv2.putText(img, label, (x, y - 10), font, 3, color, 2)
 
     cv2.imshow('Seoul Traffic Video', img)
 
