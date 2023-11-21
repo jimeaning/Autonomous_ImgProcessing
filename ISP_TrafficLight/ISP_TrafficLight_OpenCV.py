@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import time
+import datetime
 
 classes = []
 with open("./dnn/coco.names", "rt", encoding="UTF8") as f:
@@ -12,20 +12,24 @@ model = cv2.dnn.readNet("./dnn/yolov3.weights", "./dnn/yolov3.cfg")
 layer_names = model.getLayerNames()
 output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
 #output_layers = [layer_names[i[0] - 1] for i in model.getUnconnectedOutLayers()]
-#output_layers = ['yolo_82', 'yolo_94', 'yolo_106']
 
-video = cv2.VideoCapture('./video/Seoul_Traffic.mp4')
+# video = cv2.VideoCapture('./video/Seoul_Traffic.mp4')
+video = cv2.VideoCapture(0)
+video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-CONF_THR = 0.5
+CONF_THR = 0.4
 prev_time = 0
 FPS = 10
 
 while(video.isOpened()):
+    start = datetime.datetime.now()
+
     ret, frame = video.read()
 
-    current_time = time.time() - prev_time  # 시간 지연 예방
-
-    if not ret: break
+    if not ret: 
+        print('Error: Camera')
+        break
 
     #if ret and (current_time > 1./FPS):
     # 이미지 테스트, 분류 
@@ -34,7 +38,7 @@ while(video.isOpened()):
     output = model.forward(output_layers)
 
     h, w = frame.shape[0:2]
-    img = cv2.resize(frame, dsize=(int(frame.shape[1] / 2), int(frame.shape[0] / 2)))
+    img = cv2.resize(frame, dsize=(int(frame.shape[1]), int(frame.shape[0])))
     ih = int(h / 2)
     iw = int(w / 2)
 
@@ -47,7 +51,7 @@ while(video.isOpened()):
             class_id = np.argmax(scores)
             conf = scores[class_id]
 
-            if conf > CONF_THR:     # 임계치 0.5
+            if class_id < 12 and conf > CONF_THR:     # 임계치 0.5
                 center_x = int(detection[0] * iw)
                 center_y = int(detection[1] * ih)
                 w = int(detection[2] * iw)
@@ -68,8 +72,40 @@ while(video.isOpened()):
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             color = colors[i]
+            cv2.line(img, (x, y), (x, y), color, 10)
+            cv2.line(img, (x + w, y + h), (x + w, y + h), color, 10)
             cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(img, label, (x, y + 30), font, 3, color, 3)
+            cv2.putText(img, label, (x, y - 10), font, 3, color, 2)
+
+    end = datetime.datetime.now()
+
+    total = (end - start).total_seconds()
+
+    fps = f'FPS: {1 / total:.2f}'
+
+    ## 신호등 구분
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    # 초록색
+    lower_green = np.array([50,50,80])
+    higher_green = np.array([90,255,255])
+    # 빨간색
+    lower_red = np.array([-10,30,50])
+    higher_red = np.array([10,255,255])
+    # 노란색
+    lower_yellow = np.array([11,100,80])
+    higher_yellow = np.array([30,255,255])
+
+    mask_green = cv2.inRange(hsv,lower_green, higher_green)
+    mask_red = cv2.inRange(hsv, lower_red, higher_red)
+    mask_yellow = cv2.inRange(hsv, lower_yellow, higher_yellow)
+
+    res_red = cv2.bitwise_and(img,img, mask=mask_red)
+    res_green = cv2.bitwise_and(img, img, mask=mask_green)
+    res_yellow = cv2.bitwise_and(img, img, mask=mask_yellow)
+
+    cv2.imshow('Green',res_green)
+    cv2.imshow('Red',res_red)
+    cv2.imshow('Yellow', res_yellow)
 
     cv2.imshow('Seoul Traffic Video', img)
 
