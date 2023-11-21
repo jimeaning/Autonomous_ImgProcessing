@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import time
+import datetime
 
 classes = []
 with open("./dnn/coco.names", "rt", encoding="UTF8") as f:
@@ -18,16 +18,18 @@ video = cv2.VideoCapture(0)
 video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-CONF_THR = 0.6
+CONF_THR = 0.4
 prev_time = 0
 FPS = 10
 
 while(video.isOpened()):
+    start = datetime.datetime.now()
+
     ret, frame = video.read()
 
-    current_time = time.time() - prev_time  # 시간 지연 예방
-
-    if not ret: break
+    if not ret: 
+        print('Error: Camera')
+        break
 
     #if ret and (current_time > 1./FPS):
     # 이미지 테스트, 분류 
@@ -36,7 +38,7 @@ while(video.isOpened()):
     output = model.forward(output_layers)
 
     h, w = frame.shape[0:2]
-    img = cv2.resize(frame, dsize=(int(frame.shape[1] / 2), int(frame.shape[0] / 2)))
+    img = cv2.resize(frame, dsize=(int(frame.shape[1]), int(frame.shape[0])))
     ih = int(h / 2)
     iw = int(w / 2)
 
@@ -74,6 +76,36 @@ while(video.isOpened()):
             cv2.line(img, (x + w, y + h), (x + w, y + h), color, 10)
             cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
             cv2.putText(img, label, (x, y - 10), font, 3, color, 2)
+
+    end = datetime.datetime.now()
+
+    total = (end - start).total_seconds()
+
+    fps = f'FPS: {1 / total:.2f}'
+
+    ## 신호등 구분
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    # 초록색
+    lower_green = np.array([50,50,80])
+    higher_green = np.array([90,255,255])
+    # 빨간색
+    lower_red = np.array([-10,30,50])
+    higher_red = np.array([10,255,255])
+    # 노란색
+    lower_yellow = np.array([11,100,80])
+    higher_yellow = np.array([30,255,255])
+
+    mask_green = cv2.inRange(hsv,lower_green, higher_green)
+    mask_red = cv2.inRange(hsv, lower_red, higher_red)
+    mask_yellow = cv2.inRange(hsv, lower_yellow, higher_yellow)
+
+    res_red = cv2.bitwise_and(img,img, mask=mask_red)
+    res_green = cv2.bitwise_and(img, img, mask=mask_green)
+    res_yellow = cv2.bitwise_and(img, img, mask=mask_yellow)
+
+    cv2.imshow('Green',res_green)
+    cv2.imshow('Red',res_red)
+    cv2.imshow('Yellow', res_yellow)
 
     cv2.imshow('Seoul Traffic Video', img)
 
