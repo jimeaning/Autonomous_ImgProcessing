@@ -18,7 +18,7 @@ video = cv2.VideoCapture(0)
 video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-CONF_THR = 0.4
+CONF_THR = 0.6
 prev_time = 0
 FPS = 10
 
@@ -83,17 +83,17 @@ while(video.isOpened()):
 
     fps = f'FPS: {1 / total:.2f}'
 
-    ## 신호등 구분
+    ##hsv
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     # 초록색
-    lower_green = np.array([50,50,80])
-    higher_green = np.array([90,255,255])
+    lower_green = np.array([30,240,30])
+    higher_green = np.array([120,255,205])
     # 빨간색
     lower_red = np.array([-10,30,50])
     higher_red = np.array([10,255,255])
     # 노란색
-    lower_yellow = np.array([11,100,80])
-    higher_yellow = np.array([30,255,255])
+    lower_yellow = np.array([8,100,80])
+    higher_yellow = np.array([20,255,255])
 
     mask_green = cv2.inRange(hsv,lower_green, higher_green)
     mask_red = cv2.inRange(hsv, lower_red, higher_red)
@@ -102,10 +102,54 @@ while(video.isOpened()):
     res_red = cv2.bitwise_and(img,img, mask=mask_red)
     res_green = cv2.bitwise_and(img, img, mask=mask_green)
     res_yellow = cv2.bitwise_and(img, img, mask=mask_yellow)
+    
+    # 색 오픈, 확장
+    kernelSz = 3
+    shape = cv2.MORPH_RECT
+    sz = (2 * kernelSz + 1, 2 * kernelSz + 1)
+    SE = cv2.getStructuringElement(shape, sz)
 
-    cv2.imshow('Green',res_green)
-    cv2.imshow('Red',res_red)
-    cv2.imshow('Yellow', res_yellow)
+    src_Red_1st_open = cv2.morphologyEx(res_red, cv2.MORPH_OPEN, SE)
+    src_Red_2nd_dilate = cv2.morphologyEx(src_Red_1st_open, cv2.MORPH_DILATE, SE)
+
+    src_Yellow_1st_open = cv2.morphologyEx(res_yellow, cv2.MORPH_OPEN, SE)
+    src_Yellow_2nd_dilate = cv2.morphologyEx(src_Yellow_1st_open, cv2.MORPH_DILATE, SE)
+    
+    src_Green_1st_open = cv2.morphologyEx(res_green, cv2.MORPH_OPEN, SE)
+    src_Green_2nd_dilate = cv2.morphologyEx(src_Green_1st_open, cv2.MORPH_DILATE, SE)
+                
+    cv2.imshow('Red',src_Red_2nd_dilate)
+    cv2.imshow('Green',src_Green_2nd_dilate)
+    cv2.imshow('Yellow', src_Yellow_2nd_dilate)g
+    
+    # 면적
+    src_Red_2nd_dilate_gray = cv2.cvtColor(src_Red_2nd_dilate, cv2.COLOR_BGR2GRAY)
+    src_Green_2nd_dilate_gray = cv2.cvtColor(src_Green_2nd_dilate, cv2.COLOR_BGR2GRAY)
+    
+    _, src_Red_2nd_dilate_binary = cv2.threshold(src_Red_2nd_dilate_gray, 1, 255, cv2.THRESH_BINARY)
+    _, src_Green_2nd_dilate_binary = cv2.threshold(src_Green_2nd_dilate_gray, 1, 255, cv2.THRESH_BINARY)
+    cv2.imshow('src_Red_2nd_dilate_binary',src_Red_2nd_dilate_binary)
+    cv2.imshow('src_Green_2nd_dilate_gray',src_Green_2nd_dilate_gray)
+
+    contours_red, _ = cv2.findContours(src_Red_2nd_dilate_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours_green, _ = cv2.findContours(src_Green_2nd_dilate_gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    area_r = 0
+    area_g = 0
+
+    for i, contour in enumerate(contours_red):
+        area_r = cv2.contourArea(contour)
+        area_R = f"Red area = {area_r:.1f}"
+    
+    for i, contour in enumerate(contours_green):
+        area_g = cv2.contourArea(contour)
+        area_G = f"green area = {area_g:.1f}"
+        #print(area_R)
+        #print(area_G)
+    if int(area_r) > 1300:
+        print('stop')
+    
+    if int(area_g) > 1000:
+        print('go')
 
     cv2.imshow('Seoul Traffic Video', img)
 
