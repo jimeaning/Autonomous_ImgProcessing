@@ -132,6 +132,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# directory
+dnn/
+video/
+
 # Spyder project settings
 .spyderproject
 .spyproject
