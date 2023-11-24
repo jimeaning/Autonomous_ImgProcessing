@@ -1,0 +1,16 @@
+ <launch>
+
+  4   <node pkg="raspicam_node" type="raspicam_node" name="raspicam" output="scr    een">
+
+  6     <param name="camera_frame_id" value="raspicam" />
+  7     <param name="width" value="640" />
+  8     <param name="height" value="480" />
+
+ 10   </node>
+ 11   
+
+ 13   <node node pkg="move" type="camera.py" name="camera_opencv_node" output="s    creen"> 
+ 14     <param name="camera_topic" value="/raspicam/image_raw" />
+
+ 16   </node>
+ 17 </launch>

@@ -10,6 +10,7 @@ project(move)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   geometry_msgs
+  dynamic_reconfigure
 )
 
 ################################################################################
@@ -24,12 +25,15 @@ catkin_python_setup()
 ################################################################################
 # Declare ROS dynamic reconfigure parameters
 ################################################################################
-
+generate_dynamic_reconfigure_options(
+  cfg/ImageProjectionParams.cfg
+  cfg/ImageCompensationParams.cfg
+)
 ################################################################################
 # Declare catkin specific configuration to be passed to dependent projects
 ################################################################################
 catkin_package(
-  CATKIN_DEPENDS rospy geometry_msgs
+  CATKIN_DEPENDS rospy geometry_msgs dynamic_reconfigure
 )
 
 ################################################################################
@@ -41,6 +45,7 @@ catkin_package(
 ################################################################################
 catkin_install_python(PROGRAMS
   src/move.py
+  src/camera.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
