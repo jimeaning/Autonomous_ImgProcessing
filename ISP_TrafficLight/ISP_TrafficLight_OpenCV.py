@@ -83,8 +83,20 @@ while(video.isOpened()):
 
     fps = f'FPS: {1 / total:.2f}'
 
-    ##hsv
+    ##HSV
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    # Roi 영역 설정
+    roi = hsv[int(100):int(251), int(600):int(751)]
+
+    cv2.imshow('roi', roi)
+
+    roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    
+    _, roi_thre = cv2.threshold(roi_gray, 30, 255, cv2.THRESH_BINARY)
+    cv2.imshow('roi_thre', roi_thre)
+    
+
     # 초록색
     lower_green = np.array([30,240,30])
     higher_green = np.array([120,255,205])
@@ -95,13 +107,13 @@ while(video.isOpened()):
     lower_yellow = np.array([8,100,80])
     higher_yellow = np.array([20,255,255])
 
-    mask_green = cv2.inRange(hsv,lower_green, higher_green)
-    mask_red = cv2.inRange(hsv, lower_red, higher_red)
-    mask_yellow = cv2.inRange(hsv, lower_yellow, higher_yellow)
+    mask_green = cv2.inRange(roi,lower_green, higher_green)
+    mask_red = cv2.inRange(roi, lower_red, higher_red)
+    mask_yellow = cv2.inRange(roi, lower_yellow, higher_yellow)
 
-    res_red = cv2.bitwise_and(img,img, mask=mask_red)
-    res_green = cv2.bitwise_and(img, img, mask=mask_green)
-    res_yellow = cv2.bitwise_and(img, img, mask=mask_yellow)
+    res_red = cv2.bitwise_and(roi, roi, mask=mask_red)
+    res_green = cv2.bitwise_and(roi, roi, mask=mask_green)
+    res_yellow = cv2.bitwise_and(roi, roi, mask=mask_yellow)
     
     # 색 오픈, 확장
     kernelSz = 3
@@ -120,7 +132,7 @@ while(video.isOpened()):
                 
     cv2.imshow('Red',src_Red_2nd_dilate)
     cv2.imshow('Green',src_Green_2nd_dilate)
-    cv2.imshow('Yellow', src_Yellow_2nd_dilate)g
+    # cv2.imshow('Yellow', src_Yellow_2nd_dilate)
     
     # 면적
     src_Red_2nd_dilate_gray = cv2.cvtColor(src_Red_2nd_dilate, cv2.COLOR_BGR2GRAY)
@@ -143,12 +155,12 @@ while(video.isOpened()):
     for i, contour in enumerate(contours_green):
         area_g = cv2.contourArea(contour)
         area_G = f"green area = {area_g:.1f}"
-        #print(area_R)
-        #print(area_G)
+        # print(area_R)
+        # print(area_G)
     if int(area_r) > 1300:
         print('stop')
     
-    if int(area_g) > 1000:
+    if int(area_g) > 150:
         print('go')
 
     cv2.imshow('Seoul Traffic Video', img)
