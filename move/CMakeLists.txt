@@ -11,7 +11,11 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   geometry_msgs
   dynamic_reconfigure
+  sensor_msgs
+  cv_bridge
 )
+
+find_package(OpenCV REQUIRED)
 
 ################################################################################
 # Setup for python modules and scripts
@@ -25,15 +29,12 @@ catkin_python_setup()
 ################################################################################
 # Declare ROS dynamic reconfigure parameters
 ################################################################################
-generate_dynamic_reconfigure_options(
-  cfg/ImageProjectionParams.cfg
-  cfg/ImageCompensationParams.cfg
-)
+
 ################################################################################
 # Declare catkin specific configuration to be passed to dependent projects
 ################################################################################
 catkin_package(
-  CATKIN_DEPENDS rospy geometry_msgs dynamic_reconfigure
+  CATKIN_DEPENDS rospy geometry_msgs dynamic_reconfigure sensor_msgs cv_bridge
 )
 
 ################################################################################
