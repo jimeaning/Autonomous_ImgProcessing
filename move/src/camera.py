@@ -36,11 +36,12 @@ def getKey():
         
 def moveThread():
         global start_flag, current_speed,twist,pub
+        speed = 0
         while True:
                 key = getKey()
                 
                 if key == 'q':
-                        speed = 0.11
+                        speed = -0.11
                         print("시작")
                 elif key == 'w':
                         speed = 0
@@ -49,10 +50,10 @@ def moveThread():
                         print("끝")
                         break
                 if start_flag == 1:
-                        speed = 0.22
+                         speed = -0.22
 
                 elif start_flag == 0:
-                        speed = 0
+                         speed = 0
                 
                 if current_speed != speed:
                         print("속도" , speed)
