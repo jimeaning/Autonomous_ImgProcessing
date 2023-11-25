@@ -13,7 +13,7 @@ layer_names = model.getLayerNames()
 output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
 #output_layers = [layer_names[i[0] - 1] for i in model.getUnconnectedOutLayers()]
 
-# video = cv2.VideoCapture('./video/Seoul_Traffic.mp4')
+#video = cv2.VideoCapture('./video/Seoul_Traffic.mp4')
 video = cv2.VideoCapture(0)
 video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -50,6 +50,9 @@ while(video.isOpened()):
             scores = detection[5:]
             class_id = np.argmax(scores)
             conf = scores[class_id]
+            
+            if class_id == 9:
+                print()
 
             if class_id < 12 and conf > CONF_THR:     # 임계치 0.5
                 center_x = int(detection[0] * iw)
@@ -63,7 +66,8 @@ while(video.isOpened()):
                 boxes.append([x, y, w, h])
                 confidences.append(float(conf))
                 class_ids.append(class_id)
-
+    print("center_x", center_x)
+    print("x", x)
     indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)  # 노이즈 제거
 
     font = cv2.FONT_HERSHEY_PLAIN
@@ -120,7 +124,7 @@ while(video.isOpened()):
                 
     cv2.imshow('Red',src_Red_2nd_dilate)
     cv2.imshow('Green',src_Green_2nd_dilate)
-    cv2.imshow('Yellow', src_Yellow_2nd_dilate)g
+    cv2.imshow('Yellow', src_Yellow_2nd_dilate)
     
     # 면적
     src_Red_2nd_dilate_gray = cv2.cvtColor(src_Red_2nd_dilate, cv2.COLOR_BGR2GRAY)
@@ -139,17 +143,17 @@ while(video.isOpened()):
     for i, contour in enumerate(contours_red):
         area_r = cv2.contourArea(contour)
         area_R = f"Red area = {area_r:.1f}"
+        #print(area_R)
     
     for i, contour in enumerate(contours_green):
         area_g = cv2.contourArea(contour)
         area_G = f"green area = {area_g:.1f}"
-        #print(area_R)
         #print(area_G)
-    if int(area_r) > 1300:
-        print('stop')
+    # if int(area_r) > 1300:
+    #     print('stop')
     
-    if int(area_g) > 1000:
-        print('go')
+    # if int(area_g) > 1000:
+    #     print('go')
 
     cv2.imshow('Seoul Traffic Video', img)
 
@@ -160,4 +164,3 @@ while(video.isOpened()):
 
 video.release()
 cv2.destroyAllWindows()
-#test 22 
