@@ -14,22 +14,7 @@ else:
     import tty, termios,time
 
 
-classes = []
-with open("/home/gyuwon/Dataset/Yolo/coco.names", "rt", encoding="UTF8") as f:
-    classes = [line.strip() for line in f.readlines()]
-    colors = np.random.uniform(0, 255, size=(len(classes), 3))
-# 학습모델과 라벨 설정 
-model = cv2.dnn.readNet("/home/gyuwon/Dataset/Yolo/yolov3.weights", "//home/gyuwon/Dataset/Yolo/yolov3.cfg")
-layer_names = model.getLayerNames()
-output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
-CONF_THR = 0.6
-prev_time = 0
-FPS = 10
-video = None
 
-# 로봇 제어 전역변수 
-start_flag = 1
-current_speed =0
 
 def getKey():
     
@@ -42,53 +27,35 @@ def getKey():
     return key
 
 
-# def startTimer():
-#     global count, speed, green_flag, timer
-#     count += 1
-#     print("Count")
-#     timer = threading.Timer(1, startTimer)
-#     timer.start()
-    
-    
-#     if green_flag == 1:
-#         speed = 0.22
-#         print("초록불임")
-#         timer.cancel()
-    
-#     if count == 5:
-#         speed = 0
-#         count =0
-#         green_flag = 0
-#         print("타이머를 멈춘다")
-        
-#         timer.cancel()
+
         
 def moveThread():
-        global start_flag, current_speed
-        
-        key = getKey()
-         
-        if key == 'q':
-                speed = 0.11
-                print("시작")
-        elif key == 'w':
-                speed = 0
-                print("멈춤")
-        elif key == 'e':
-                print("끝")
-                exit
-        if start_flag == 1:
-                speed = 0.22
+        global start_flag, current_speed,twist,pub
+        while True:
+                key = getKey()
+                
+                if key == 'q':
+                        speed = 0.11
+                        print("시작")
+                elif key == 'w':
+                        speed = 0
+                        print("멈춤")
+                elif key == 'e':
+                        print("끝")
+                        break
+                if start_flag == 1:
+                        speed = 0.22
 
-        elif start_flag == 0:
-                speed = 0
-        
-        if current_speed != speed:
-                print("속도" , speed)
-                current_speed = speed
+                elif start_flag == 0:
+                        speed = 0
+                
+                if current_speed != speed:
+                        print("속도" , speed)
+                        current_speed = speed
+                        
                 twist.linear.x = speed
                 pub.publish(twist)
-        print("돌고있음")
+                
         
 
 def image_callback(ros_image_compressed):
@@ -248,6 +215,24 @@ def image_callback(ros_image_compressed):
     
 
 if __name__ == '__main__':
+        classes = []
+        with open("/home/gyuwon/Dataset/Yolo/coco.names", "rt", encoding="UTF8") as f:
+                classes = [line.strip() for line in f.readlines()]
+                colors = np.random.uniform(0, 255, size=(len(classes), 3))
+                
+        # 학습모델과 라벨 설정 
+        model = cv2.dnn.readNet("/home/gyuwon/Dataset/Yolo/yolov3.weights", "//home/gyuwon/Dataset/Yolo/yolov3.cfg")
+        layer_names = model.getLayerNames()
+        output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
+        CONF_THR = 0.6
+        prev_time = 0
+        FPS = 10
+        video = None
+
+        # 로봇 제어 전역변수 
+        start_flag = 1
+        current_speed =0
+        
         
         # 카메라 처리 
         rospy.init_node('autonomous_move')
@@ -256,20 +241,21 @@ if __name__ == '__main__':
         print("Subscribe start")
 
         # 로봇 움직임 처리 
-        # pub = rospy.Publisher('cmd_vel', Twist, queue_size = 10)
+        pub = rospy.Publisher('cmd_vel', Twist, queue_size = 10)
         
-        # twist = Twist()
+        twist = Twist()
 
-        # twist.linear.x = twist.linear.y = twist.linear.z = 0
-        # twist.angular.x = twist.angular.y = twist.angular.z = 0
+        twist.linear.x = twist.linear.y = twist.linear.z = 0
+        twist.angular.x = twist.angular.y = twist.angular.z = 0
+         
+        pub.publish(twist)
         
-        # pub.publish(twist)
-        
-        # # 로봇 제어 쓰레드 실행
-        # moveth = threading.Thread(target=moveThread)
-        # moveth.start()
-        # moveth.join()
+         # 로봇 제어 쓰레드 실행
+        moveth = threading.Thread(target=moveThread)
+        moveth.start()
         
         # 카메라 계속 찍게 하는거 라고 생각하면됨
         rospy.spin()
+        
+        
         
