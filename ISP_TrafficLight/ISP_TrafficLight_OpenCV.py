@@ -13,8 +13,8 @@ layer_names = model.getLayerNames()
 output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
 #output_layers = [layer_names[i[0] - 1] for i in model.getUnconnectedOutLayers()]
 
-# video = cv2.VideoCapture('./video/Seoul_Traffic.mp4')
-video = cv2.VideoCapture(0)
+video = cv2.VideoCapture('./video/test6.mp4')
+# video = cv2.VideoCapture(0)
 video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
@@ -31,9 +31,13 @@ while(video.isOpened()):
         print('Error: Camera')
         break
 
+    # ROI 횡단보도 영역
+    roi_ppl = frame[int(300):int(451), int(400):int(801)]
+    cv2.imshow('roi_ppl', roi_ppl)
+
     #if ret and (current_time > 1./FPS):
     # 이미지 테스트, 분류 
-    blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    blob = cv2.dnn.blobFromImage(roi_ppl, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
     model.setInput(blob)
     output = model.forward(output_layers)
 
@@ -50,6 +54,12 @@ while(video.isOpened()):
             scores = detection[5:]
             class_id = np.argmax(scores)
             conf = scores[class_id]
+
+            if class_id == 0 and conf > CONF_THR:
+                print('Detected Person : Stop')
+
+            # if class_id == 9:
+            #     print(x, y, w, h)
 
             if class_id < 12 and conf > CONF_THR:     # 임계치 0.5
                 center_x = int(detection[0] * iw)
@@ -78,24 +88,19 @@ while(video.isOpened()):
             cv2.putText(img, label, (x, y - 10), font, 3, color, 2)
 
     end = datetime.datetime.now()
-
     total = (end - start).total_seconds()
-
     fps = f'FPS: {1 / total:.2f}'
 
     ##HSV
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    # Roi 영역 설정
+    # ROI 신호등 영역 설정
     roi = hsv[int(100):int(251), int(600):int(751)]
-
     cv2.imshow('roi', roi)
 
     roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-    
     _, roi_thre = cv2.threshold(roi_gray, 30, 255, cv2.THRESH_BINARY)
     cv2.imshow('roi_thre', roi_thre)
-    
 
     # 초록색
     lower_green = np.array([30,240,30])
@@ -172,4 +177,3 @@ while(video.isOpened()):
 
 video.release()
 cv2.destroyAllWindows()
-#test 22 
