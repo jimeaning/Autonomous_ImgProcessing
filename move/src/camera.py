@@ -13,9 +13,6 @@ import rospkg
 rospack = rospkg.RosPack()
 package_path = rospack.get_path('move')
 
-print(package_path)
-
-
 if os.name == 'nt':
     import msvcrt,time
 else:
@@ -49,11 +46,6 @@ def moveThread():
                 elif key == 'e':
                         print("끝")
                         break
-                if start_flag == 1:
-                         speed = -0.22
-
-                elif start_flag == 0:
-                         speed = 0
                 
                 if current_speed != speed:
                         print("속도" , speed)
@@ -222,12 +214,12 @@ def image_callback(ros_image_compressed):
 
 if __name__ == '__main__':
         classes = []
-        with open("/home/gyuwon/Dataset/Yolo/coco.names", "rt", encoding="UTF8") as f:
+        with open(package_path + "/../../../Yolo/coco.names", "rt", encoding="UTF8") as f:
                 classes = [line.strip() for line in f.readlines()]
                 colors = np.random.uniform(0, 255, size=(len(classes), 3))
                 
         # 학습모델과 라벨 설정 
-        model = cv2.dnn.readNet("/home/gyuwon/Dataset/Yolo/yolov3.weights", "//home/gyuwon/Dataset/Yolo/yolov3.cfg")
+        model = cv2.dnn.readNet(package_path + "/../../../Yolo/yolov3.weights", package_path + "/../../../Yolo/yolov3.cfg")
         layer_names = model.getLayerNames()
         output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
         CONF_THR = 0.6
