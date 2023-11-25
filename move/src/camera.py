@@ -8,13 +8,18 @@ import numpy as np
 import threading
 import datetime
 
+import rospkg
+
+rospack = rospkg.RosPack()
+package_path = rospack.get_path('move')
+
+print(package_path)
+
+
 if os.name == 'nt':
     import msvcrt,time
 else:
     import tty, termios,time
-
-
-
 
 def getKey():
     
@@ -256,6 +261,3 @@ if __name__ == '__main__':
         
         # 카메라 계속 찍게 하는거 라고 생각하면됨
         rospy.spin()
-        
-        
-        
