@@ -13,8 +13,6 @@ import rospkg
 rospack = rospkg.RosPack()
 package_path = rospack.get_path('move')
 
-
-
 if os.name == 'nt':
     import msvcrt,time
 else:
@@ -43,7 +41,7 @@ def moveThread():
                 key = getKey()
                 
                 if key == 'q':
-                        speed = -0.11
+                        speed = -0.22
                         print("시작")
                 elif key == 'w':
                         speed = 0
@@ -86,11 +84,13 @@ def image_callback(ros_image_compressed):
                         
                         trackerStopLine = cv2.TrackerMIL_create()
                         
-                        StopLineROI = (216,377,174,16)
+                        StopLineROI = (180,330,174,16)
                         
-                        trackerStopLine.init(video,StopLineROI)
+                        trackerStopLine.init(video, StopLineROI)
                         
-
+                
+                
+                
                 # 이미지 테스트, 분류 
 
                 
@@ -98,7 +98,7 @@ def image_callback(ros_image_compressed):
                 ret, TrafficROI = tracker.update(video)
 
                 cv2.rectangle(video, TrafficROI[:4], (0,0,255), 2)
-                cv2.imshow('frame', video)
+                
                 
 
                 ROI_x = TrafficROI[0]
@@ -109,24 +109,26 @@ def image_callback(ros_image_compressed):
 
                 TrafficImage = video[ROI_y:ROI_y + ROI_h, 
                                         ROI_x:ROI_x + ROI_w]
-                
-                
+                                        
                 TrafficHSV = cv2.cvtColor(TrafficImage,cv2.COLOR_BGR2HSV)
 
                 # 정지선 트랙커 설정
                 ret2 ,StopLineROI = trackerStopLine.update(video)
                 
+                #cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
+                
                 StopROI_y = StopLineROI[1]
                 StopROI_h = StopLineROI[3]
+                
                 
                 if video_h -(StopROI_y + StopROI_h)  < 5:
                         EndFlag = 1
 
-                if EndFlag == 1:
-                        cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
-                else:
-                        cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
-                
+                #if EndFlag == 1:
+                #        cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
+                #else:
+                #        cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
+                cv2.imshow('frame', video)
                 
                 # 색 검출 과정 
                 # 초록색
@@ -230,6 +232,7 @@ if __name__ == '__main__':
         twist.angular.x = twist.angular.y = twist.angular.z = 0
          
         pub.publish(twist)
+        
         
          # 로봇 제어 쓰레드 실행
         moveth = threading.Thread(target=moveThread)
