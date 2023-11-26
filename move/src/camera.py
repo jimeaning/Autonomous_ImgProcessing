@@ -67,14 +67,14 @@ def image_callback(ros_image_compressed):
                 np_arr = np.frombuffer(ros_image_compressed.data, np.uint8)
                 video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 video = cv2.resize(video,(640,480))
-                
                 video_h,_,_ = video.shape 
+
+                video = cv2.rotate(video, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
                 if tracker is None:
                         tracker = cv2.TrackerMIL_create()
-                        
-                        
-                        x = 260
-                        y = 230
+                        x = 230
+                        y = 200
                         w = 70
                         h = 50
                         
@@ -95,11 +95,11 @@ def image_callback(ros_image_compressed):
 
                 
                 # 트랙커 설정
-                
                 ret, TrafficROI = tracker.update(video)
-                
+
                 cv2.rectangle(video, TrafficROI[:4], (0,0,255), 2)
                 cv2.imshow('frame', video)
+                
 
                 ROI_x = TrafficROI[0]
                 ROI_y = TrafficROI[1]
