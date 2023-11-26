@@ -63,13 +63,16 @@ def moveThread():
 
 def image_callback(ros_image_compressed):
         try:
-                global tracker
+                global tracker,EndFlag,trackerStopLine
                 np_arr = np.frombuffer(ros_image_compressed.data, np.uint8)
                 video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 video = cv2.resize(video,(640,480))
-
+                
+                video_h,_,_ = video.shape 
                 if tracker is None:
                         tracker = cv2.TrackerMIL_create()
+                        
+                        
                         x = 260
                         y = 230
                         w = 70
@@ -78,6 +81,15 @@ def image_callback(ros_image_compressed):
                         TrafficRoi = (x,y,w,h)
                         
                         tracker.init(video, TrafficRoi)
+                        
+                if trackerStopLine is None:
+                        
+                        trackerStopLine = cv2.TrackerMIL_create()
+                        
+                        StopLineROI = (216,377,174,16)
+                        
+                        trackerStopLine.init(video,StopLineROI)
+                        
 
                 # 이미지 테스트, 분류 
 
@@ -100,11 +112,21 @@ def image_callback(ros_image_compressed):
                 
                 
                 TrafficHSV = cv2.cvtColor(TrafficImage,cv2.COLOR_BGR2HSV)
-                #TrafficHSV = cv2.cvtColor(video,cv2.COLOR_RGB2HSV)
-                #TrafficGray = cv2.cvtColor(TrafficHSV, cv2.COLOR_BGR2GRAY)
-                #TrafficBin = cv2.cvtColor(TrafficGray, cv2.THRESH_BINARY)
+
+                # 정지선 트랙커 설정
+                ret2 ,StopLineROI = trackerStopLine.update(video)
                 
-                #cv2.imshow('bin', TrafficBin)
+                StopROI_y = StopLineROI[1]
+                StopROI_h = StopLineROI[3]
+                
+                if video_h -(StopROI_y + StopROI_h)  < 5:
+                        EndFlag = 1
+
+                if EndFlag == 1:
+                        cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
+                else:
+                        cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
+                
                 
                 # 색 검출 과정 
                 # 초록색
@@ -151,7 +173,7 @@ def image_callback(ros_image_compressed):
                 _, src_Green_2nd_dilate_binary = cv2.threshold(src_Green_2nd_dilate_gray, 1, 255, cv2.THRESH_BINARY)
 
                 contours_red, _ = cv2.findContours(src_Red_2nd_dilate_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                contours_green, _ = cv2.findContours(src_Green_2nd_dilate_gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                contours_green, _ = cv2.findContours(src_Green_2nd_dilate_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 area_r = 0
                 area_g = 0
 
@@ -185,6 +207,9 @@ def image_callback(ros_image_compressed):
 if __name__ == '__main__':
         
         tracker = None
+        trackerStopLine =None
+        EndFlag = 0
+        
         
         # 로봇 제어 전역변수 
         start_flag = 1
