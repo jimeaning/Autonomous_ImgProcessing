@@ -13,10 +13,15 @@ import rospkg
 rospack = rospkg.RosPack()
 package_path = rospack.get_path('move')
 
+
+
 if os.name == 'nt':
     import msvcrt,time
 else:
     import tty, termios,time
+
+
+
 
 def getKey():
     
@@ -58,99 +63,69 @@ def moveThread():
 
 def image_callback(ros_image_compressed):
         try:
-                global x, y, classes, layer_names,output_layers,CONF_THR,prev_time,FPS
-                global start_flag 
+                global tracker
                 np_arr = np.frombuffer(ros_image_compressed.data, np.uint8)
                 video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 video = cv2.resize(video,(640,480))
+
+                if tracker is None:
+                        tracker = cv2.TrackerMIL_create()
+                        x = 260
+                        y = 230
+                        w = 70
+                        h = 50
+                        
+                        TrafficRoi = (x,y,w,h)
+                        
+                        tracker.init(video, TrafficRoi)
+
+                # 이미지 테스트, 분류 
+
                 
-                start = datetime.datetime.now()
+                # 트랙커 설정
                 
-                #if ret and (current_time > 1./FPS):
-    # 이미지 테스트, 분류 
-                blob = cv2.dnn.blobFromImage(video, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
-                model.setInput(blob)
-                output = model.forward(output_layers)
-
-                h, w = video.shape[0:2]
-                img = cv2.resize(video, dsize=(int(video.shape[1]), int(video.shape[0])))
-                ih = int(h / 2)
-                iw = int(w / 2)
-
-                class_ids = []
-                confidences = []
-                boxes = []
-                for out in output:
-                        for detection in out:
-                                scores = detection[5:]
-                                class_id = np.argmax(scores)
-                                conf = scores[class_id]
-
-                                if class_id < 12 and conf > CONF_THR:     # 임계치 0.5
-                                        center_x = int(detection[0] * iw)
-                                        center_y = int(detection[1] * ih)
-                                        w = int(detection[2] * iw)
-                                        h = int(detection[3] * ih)
-                                        # 사각형 좌표
-                                        x = int(center_x - w / 2)
-                                        y = int(center_y - h / 2)
-
-                                        boxes.append([x, y, w, h])
-                                        confidences.append(float(conf))
-                                        class_ids.append(class_id)
-
-                indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)  # 노이즈 제거
-
-                font = cv2.FONT_HERSHEY_PLAIN
-                for i in range(len(boxes)):
-                        if i in indexes:
-                                x, y, w, h = boxes[i]
-                                label = str(classes[class_ids[i]])
-                                color = colors[i]
-                                cv2.line(img, (x, y), (x, y), color, 10)
-                                cv2.line(img, (x + w, y + h), (x + w, y + h), color, 10)
-                                cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-                                cv2.putText(img, label, (x, y - 10), font, 3, color, 2)
-
-                end = datetime.datetime.now()
-
-                total = (end - start).total_seconds()
-
-                fps = f'FPS: {1 / total:.2f}'
-                cv2.imshow('color', img)
-                ##HSV
-                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-                # Roi 영역 설정
-                roi = hsv[int(100):int(251), int(600):int(751)]
-
-                cv2.imshow('roi', roi)
-
-                roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                ret, TrafficROI = tracker.update(video)
                 
-                _, roi_thre = cv2.threshold(roi_gray, 30, 255, cv2.THRESH_BINARY)
-                cv2.imshow('roi_thre', roi_thre)
-                
+                cv2.rectangle(video, TrafficROI[:4], (0,0,255), 2)
+                cv2.imshow('frame', video)
 
+                ROI_x = TrafficROI[0]
+                ROI_y = TrafficROI[1]
+                ROI_w = TrafficROI[2]
+                ROI_h = TrafficROI[3]
+
+
+                TrafficImage = video[ROI_y:ROI_y + ROI_h, 
+                                        ROI_x:ROI_x + ROI_w]
+                
+                
+                TrafficHSV = cv2.cvtColor(TrafficImage,cv2.COLOR_BGR2HSV)
+                #TrafficHSV = cv2.cvtColor(video,cv2.COLOR_RGB2HSV)
+                #TrafficGray = cv2.cvtColor(TrafficHSV, cv2.COLOR_BGR2GRAY)
+                #TrafficBin = cv2.cvtColor(TrafficGray, cv2.THRESH_BINARY)
+                
+                #cv2.imshow('bin', TrafficBin)
+                
+                # 색 검출 과정 
                 # 초록색
-                lower_green = np.array([30,240,30])
-                higher_green = np.array([120,255,205])
+                lower_green = np.array([36,30,30])
+                higher_green = np.array([83,255,255])
                 # 빨간색
-                lower_red = np.array([-10,30,50])
-                higher_red = np.array([10,255,255])
-                # 노란색
-                lower_yellow = np.array([8,100,80])
-                higher_yellow = np.array([20,255,255])
+                lower_red = np.array([15,100,0])
+                higher_red = np.array([173,255,255])
+                # # 노란색
+                # lower_yellow = np.array([8,100,80])
+                # higher_yellow = np.array([20,255,255])
 
-                mask_green = cv2.inRange(roi,lower_green, higher_green)
-                mask_red = cv2.inRange(roi, lower_red, higher_red)
-                mask_yellow = cv2.inRange(roi, lower_yellow, higher_yellow)
+                mask_green = cv2.inRange(TrafficHSV,lower_green, higher_green)
+                mask_red = cv2.inRange(TrafficHSV, lower_red, higher_red)
+                # mask_yellow = cv2.inRange(TrafficHSV, lower_yellow, higher_yellow)
 
-                res_red = cv2.bitwise_and(roi, roi, mask=mask_red)
-                res_green = cv2.bitwise_and(roi, roi, mask=mask_green)
-                res_yellow = cv2.bitwise_and(roi, roi, mask=mask_yellow)
+                res_red = cv2.bitwise_and(TrafficHSV, TrafficHSV, mask=mask_red)
+                res_green = cv2.bitwise_and(TrafficHSV, TrafficHSV, mask=mask_green)
+                # res_yellow = cv2.bitwise_and(TrafficHSV, TrafficHSV, mask=mask_yellow)
                 
-                # 색 오픈, 확장
+                # 색오픈 확장
                 kernelSz = 3
                 shape = cv2.MORPH_RECT
                 sz = (2 * kernelSz + 1, 2 * kernelSz + 1)
@@ -159,15 +134,14 @@ def image_callback(ros_image_compressed):
                 src_Red_1st_open = cv2.morphologyEx(res_red, cv2.MORPH_OPEN, SE)
                 src_Red_2nd_dilate = cv2.morphologyEx(src_Red_1st_open, cv2.MORPH_DILATE, SE)
 
-                src_Yellow_1st_open = cv2.morphologyEx(res_yellow, cv2.MORPH_OPEN, SE)
-                src_Yellow_2nd_dilate = cv2.morphologyEx(src_Yellow_1st_open, cv2.MORPH_DILATE, SE)
+                #src_Yellow_1st_open = cv2.morphologyEx(res_yellow, cv2.MORPH_OPEN, SE)
+                #src_Yellow_2nd_dilate = cv2.morphologyEx(src_Yellow_1st_open, cv2.MORPH_DILATE, SE)
                 
                 src_Green_1st_open = cv2.morphologyEx(res_green, cv2.MORPH_OPEN, SE)
                 src_Green_2nd_dilate = cv2.morphologyEx(src_Green_1st_open, cv2.MORPH_DILATE, SE)
                                 
-                cv2.imshow('Red',src_Red_2nd_dilate)
-                cv2.imshow('Green',src_Green_2nd_dilate)
-                # cv2.imshow('Yellow', src_Yellow_2nd_dilate)
+                
+                #cv2.imshow('Yellow', src_Yellow_2nd_dilate)
                 
                 # 면적
                 src_Red_2nd_dilate_gray = cv2.cvtColor(src_Red_2nd_dilate, cv2.COLOR_BGR2GRAY)
@@ -175,8 +149,6 @@ def image_callback(ros_image_compressed):
                 
                 _, src_Red_2nd_dilate_binary = cv2.threshold(src_Red_2nd_dilate_gray, 1, 255, cv2.THRESH_BINARY)
                 _, src_Green_2nd_dilate_binary = cv2.threshold(src_Green_2nd_dilate_gray, 1, 255, cv2.THRESH_BINARY)
-                cv2.imshow('src_Red_2nd_dilate_binary',src_Red_2nd_dilate_binary)
-                cv2.imshow('src_Green_2nd_dilate_gray',src_Green_2nd_dilate_gray)
 
                 contours_red, _ = cv2.findContours(src_Red_2nd_dilate_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 contours_green, _ = cv2.findContours(src_Green_2nd_dilate_gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -186,23 +158,23 @@ def image_callback(ros_image_compressed):
                 for i, contour in enumerate(contours_red):
                         area_r = cv2.contourArea(contour)
                         area_R = f"Red area = {area_r:.1f}"
+                        print(area_R)
                 
                 for i, contour in enumerate(contours_green):
                         area_g = cv2.contourArea(contour)
                         area_G = f"green area = {area_g:.1f}"
-                        # print(area_R)
-                        # print(area_G)
-                if int(area_r) > 1300:
-                        print('stop')
-                        start_flag = 0
-                if int(area_g) > 150:
-                        print('go')
-                        start_flag = 1
-                cv2.imshow('Seoul Traffic Video', img)
+                        print(area_G)
+                # if int(area_r) > 1300:
+                #     print('stop')
+                
+                # if int(area_g) > 1000:
+                #     print('go')
+                
 
+                # ESC를 누르면 종료
                 key = cv2.waitKey(1) & 0xFF
                 if (key == 27): 
-                        exit
+                        exit()
                 
         except CvBridgeError as e:
                 print("Error")
@@ -210,28 +182,14 @@ def image_callback(ros_image_compressed):
 
 
 
-    
-
 if __name__ == '__main__':
-        classes = []
-        with open(package_path + "/../../../Yolo/coco.names", "rt", encoding="UTF8") as f:
-                classes = [line.strip() for line in f.readlines()]
-                colors = np.random.uniform(0, 255, size=(len(classes), 3))
-                
-        # 학습모델과 라벨 설정 
-        model = cv2.dnn.readNet(package_path + "/../../../Yolo/yolov3.weights", package_path + "/../../../Yolo/yolov3.cfg")
-        layer_names = model.getLayerNames()
-        output_layers = [layer_names[i - 1] for i in model.getUnconnectedOutLayers()]
-        CONF_THR = 0.6
-        prev_time = 0
-        FPS = 10
-        video = None
-
+        
+        tracker = None
+        
         # 로봇 제어 전역변수 
         start_flag = 1
         current_speed =0
-        
-        
+ 
         # 카메라 처리 
         rospy.init_node('autonomous_move')
         image_topic = "/raspicam_node/image/compressed"
