@@ -6,7 +6,7 @@ import sys, select ,os, threading
 import cv2
 import numpy as np
 import threading
-import datetime
+import time
 
 import rospkg
 
@@ -35,33 +35,49 @@ def getKey():
 
         
 def moveThread():
-        global start_flag, current_speed,twist,pub
+        global  twist,pub,EndFlag, traffic_flag
+        Start = 0
         speed = 0
+        current_speed =0 
+        
         while True:
                 key = getKey()
                 
                 if key == 'q':
-                        speed = -0.22
+                        speed = -0.11
+                        Start = 1
                         print("시작")
                 elif key == 'w':
                         speed = 0
+                        Start = 0
                         print("멈춤")
                 elif key == 'e':
                         print("끝")
                         break
                 
+                
+                if Start == 1:        
+                        if traffic_flag == 1:
+                                print("초록색")
+                                speed = -0.11
+                        elif traffic_flag == 0:
+                                if EndFlag == 0:
+                                        print("빨간색 그리고 정지선")
+                                        time.sleep(1)
+                                        speed = 0
+                                
                 if current_speed != speed:
                         print("속도" , speed)
                         current_speed = speed
                         
-                twist.linear.x = speed
+                twist.linear.x = speed        
                 pub.publish(twist)
-                
+                        
         
 
 def image_callback(ros_image_compressed):
         try:
-                global tracker,EndFlag,trackerStopLine,start_flag,current_flag
+                global tracker,EndFlag,trackerStopLine,start_flag,current_flag, traffic_flag
                 np_arr = np.frombuffer(ros_image_compressed.data, np.uint8)
                 video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 video = cv2.resize(video,(640,480))
@@ -92,8 +108,8 @@ def image_callback(ros_image_compressed):
                 
                 # 트랙커 설정
                 ret, TrafficROI = tracker.update(video)
+                
 
-                cv2.rectangle(video, TrafficROI[:4], (0,0,255), 2)
                 
                 ROI_x = TrafficROI[0]
                 ROI_y = TrafficROI[1]
@@ -106,8 +122,8 @@ def image_callback(ros_image_compressed):
                 TrafficHSV = cv2.cvtColor(TrafficImage,cv2.COLOR_BGR2HSV)
 
                 # 정지선 트랙커 설정
-                ret2 ,StopLineROI = trackerStopLine.update(video)
-                                
+                ret2 ,StopLineROI = trackerStopLine.update(video)                
+                
                 StopROI_x = StopLineROI[0]  
                 StopROI_y = StopLineROI[1]
                 StopROI_w = StopLineROI[2]
@@ -115,11 +131,9 @@ def image_callback(ros_image_compressed):
                 
                 
                 if video_h - (StopROI_y + StopROI_h)  < 5:
-                        EndFlag = 1
-
-                print(EndFlag)
+                        EndFlag = 0
                 
-                if EndFlag == 1:
+                if EndFlag == 0:
                         cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
                 else:
                         cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
@@ -176,8 +190,10 @@ def image_callback(ros_image_compressed):
                 if current_flag != start_flag:
                         if start_flag == 0:
                                 print("red")
+                                traffic_flag = 1
                         else:
                                 print("green")
+                                traffic_flag = 0
                                 
                 current_flag = start_flag
                 # ESC를 누르면 종료
@@ -195,8 +211,9 @@ if __name__ == '__main__':
         
         tracker = None
         trackerStopLine =None
-        EndFlag = 0
+        EndFlag = 1
         current_flag = 0
+        traffic_flag = 0
         
         # 로봇 제어 전역변수 
         start_flag = 1
