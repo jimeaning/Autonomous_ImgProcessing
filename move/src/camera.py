@@ -61,11 +61,11 @@ def moveThread():
 
 def image_callback(ros_image_compressed):
         try:
-                global tracker,EndFlag,trackerStopLine
+                global tracker,EndFlag,trackerStopLine,start_flag,current_flag
                 np_arr = np.frombuffer(ros_image_compressed.data, np.uint8)
                 video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 video = cv2.resize(video,(640,480))
-                video_h,_,_ = video.shape 
+                video_h,video_w,video_c = video.shape 
 
                 video = cv2.rotate(video, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
@@ -87,25 +87,18 @@ def image_callback(ros_image_compressed):
                         StopLineROI = (200,340,174,16)
                         
                         trackerStopLine.init(video, StopLineROI)
-                        
-                
-                
-                
-                # 이미지 테스트, 분류 
 
+                # 이미지 테스트, 분류 
                 
                 # 트랙커 설정
                 ret, TrafficROI = tracker.update(video)
 
                 cv2.rectangle(video, TrafficROI[:4], (0,0,255), 2)
                 
-                
-
                 ROI_x = TrafficROI[0]
                 ROI_y = TrafficROI[1]
                 ROI_w = TrafficROI[2]
                 ROI_h = TrafficROI[3]
-
 
                 TrafficImage = video[ROI_y:ROI_y + ROI_h, 
                                         ROI_x:ROI_x + ROI_w]
@@ -114,16 +107,18 @@ def image_callback(ros_image_compressed):
 
                 # 정지선 트랙커 설정
                 ret2 ,StopLineROI = trackerStopLine.update(video)
-                
-                cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
-                
+                                
+                StopROI_x = StopLineROI[0]  
                 StopROI_y = StopLineROI[1]
+                StopROI_w = StopLineROI[2]
                 StopROI_h = StopLineROI[3]
                 
                 
-                if video_h -(StopROI_y + StopROI_h)  < 5:
+                if video_h - (StopROI_y + StopROI_h)  < 5:
                         EndFlag = 1
 
+                print(EndFlag)
+                
                 if EndFlag == 1:
                         cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
                 else:
@@ -137,17 +132,12 @@ def image_callback(ros_image_compressed):
                 # 빨간색
                 lower_red = np.array([15,100,0])
                 higher_red = np.array([173,255,255])
-                # # 노란색
-                # lower_yellow = np.array([8,100,80])
-                # higher_yellow = np.array([20,255,255])
-
+                # 마스크 과정 
                 mask_green = cv2.inRange(TrafficHSV,lower_green, higher_green)
                 mask_red = cv2.inRange(TrafficHSV, lower_red, higher_red)
-                # mask_yellow = cv2.inRange(TrafficHSV, lower_yellow, higher_yellow)
 
                 res_red = cv2.bitwise_and(TrafficHSV, TrafficHSV, mask=mask_red)
                 res_green = cv2.bitwise_and(TrafficHSV, TrafficHSV, mask=mask_green)
-                # res_yellow = cv2.bitwise_and(TrafficHSV, TrafficHSV, mask=mask_yellow)
                 
                 # 색오픈 확장
                 kernelSz = 3
@@ -157,16 +147,10 @@ def image_callback(ros_image_compressed):
 
                 src_Red_1st_open = cv2.morphologyEx(res_red, cv2.MORPH_OPEN, SE)
                 src_Red_2nd_dilate = cv2.morphologyEx(src_Red_1st_open, cv2.MORPH_DILATE, SE)
-
-                #src_Yellow_1st_open = cv2.morphologyEx(res_yellow, cv2.MORPH_OPEN, SE)
-                #src_Yellow_2nd_dilate = cv2.morphologyEx(src_Yellow_1st_open, cv2.MORPH_DILATE, SE)
                 
                 src_Green_1st_open = cv2.morphologyEx(res_green, cv2.MORPH_OPEN, SE)
                 src_Green_2nd_dilate = cv2.morphologyEx(src_Green_1st_open, cv2.MORPH_DILATE, SE)
                                 
-                
-                #cv2.imshow('Yellow', src_Yellow_2nd_dilate)
-                
                 # 면적
                 src_Red_2nd_dilate_gray = cv2.cvtColor(src_Red_2nd_dilate, cv2.COLOR_BGR2GRAY)
                 src_Green_2nd_dilate_gray = cv2.cvtColor(src_Green_2nd_dilate, cv2.COLOR_BGR2GRAY)
@@ -181,16 +165,21 @@ def image_callback(ros_image_compressed):
 
                 for i, contour in enumerate(contours_red):
                         area_r = cv2.contourArea(contour)
-                        area_R = f"Red area = {area_r:.1f}"
-                        print(area_R)
+                        start_flag = 0
+                        
                 
                 for i, contour in enumerate(contours_green):
                         area_g = cv2.contourArea(contour)
-                        area_G = f"green area = {area_g:.1f}"
-                        print(area_G)
+                        start_flag = 1
+                        
                 
-                
-
+                if current_flag != start_flag:
+                        if start_flag == 0:
+                                print("red")
+                        else:
+                                print("green")
+                                
+                current_flag = start_flag
                 # ESC를 누르면 종료
                 key = cv2.waitKey(1) & 0xFF
                 if (key == 27): 
@@ -207,7 +196,7 @@ if __name__ == '__main__':
         tracker = None
         trackerStopLine =None
         EndFlag = 0
-
+        current_flag = 0
         
         # 로봇 제어 전역변수 
         start_flag = 1
