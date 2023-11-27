@@ -71,9 +71,9 @@ def image_callback(ros_image_compressed):
 
                 if tracker is None:
                         tracker = cv2.TrackerMIL_create()
-                        x = 230
-                        y = 200
-                        w = 70
+                        x = 130
+                        y = 190
+                        w = 270
                         h = 50
                         
                         TrafficRoi = (x,y,w,h)
@@ -84,7 +84,7 @@ def image_callback(ros_image_compressed):
                         
                         trackerStopLine = cv2.TrackerMIL_create()
                         
-                        StopLineROI = (180,330,174,16)
+                        StopLineROI = (200,340,174,16)
                         
                         trackerStopLine.init(video, StopLineROI)
                         
@@ -115,7 +115,7 @@ def image_callback(ros_image_compressed):
                 # 정지선 트랙커 설정
                 ret2 ,StopLineROI = trackerStopLine.update(video)
                 
-                #cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
+                cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
                 
                 StopROI_y = StopLineROI[1]
                 StopROI_h = StopLineROI[3]
@@ -124,10 +124,10 @@ def image_callback(ros_image_compressed):
                 if video_h -(StopROI_y + StopROI_h)  < 5:
                         EndFlag = 1
 
-                #if EndFlag == 1:
-                #        cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
-                #else:
-                #        cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
+                if EndFlag == 1:
+                        cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
+                else:
+                        cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
                 cv2.imshow('frame', video)
                 
                 # 색 검출 과정 
@@ -188,11 +188,7 @@ def image_callback(ros_image_compressed):
                         area_g = cv2.contourArea(contour)
                         area_G = f"green area = {area_g:.1f}"
                         print(area_G)
-                # if int(area_r) > 1300:
-                #     print('stop')
                 
-                # if int(area_g) > 1000:
-                #     print('go')
                 
 
                 # ESC를 누르면 종료
@@ -211,7 +207,7 @@ if __name__ == '__main__':
         tracker = None
         trackerStopLine =None
         EndFlag = 0
-        
+
         
         # 로봇 제어 전역변수 
         start_flag = 1
