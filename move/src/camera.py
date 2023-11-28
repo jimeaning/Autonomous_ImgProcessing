@@ -2,21 +2,16 @@ import rospy
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Twist
-import sys, select ,os, threading
-import cv2
-import numpy as np
+import sys, select ,os
 import threading
-import time
-
-import rospkg
-
-rospack = rospkg.RosPack()
-package_path = rospack.get_path('move')
-
 if os.name == 'nt':
     import msvcrt,time
 else:
     import tty, termios,time
+
+import cv2
+import numpy as np
+
 
 
 
@@ -35,10 +30,11 @@ def getKey():
 
         
 def moveThread():
-        global  twist,pub,EndFlag, traffic_flag
-        Start = 0
+        global  twist,pub,StopLineFlag, GreenLightFlag
+        
         speed = 0
         current_speed =0 
+        Start = 0
         
         while True:
                 key = getKey()
@@ -50,22 +46,25 @@ def moveThread():
                 elif key == 'w':
                         speed = 0
                         Start = 0
-                        print("멈춤")
+                        print("강제멈춤")
                 elif key == 'e':
                         print("끝")
                         break
                 
                 
                 if Start == 1:        
-                        if traffic_flag == 1:
+                        if GreenLightFlag == 1:
                                 print("초록색")
                                 speed = -0.11
-                        elif traffic_flag == 0:
-                                if EndFlag == 0:
+                        elif GreenLightFlag == 0:
+                                if StopLineFlag == 0:
                                         print("빨간색 그리고 정지선")
                                         time.sleep(1)
                                         speed = 0
-                                
+                                else:
+                                        print("빨간색")
+                                        speed = -0.11
+                                        
                 if current_speed != speed:
                         print("속도" , speed)
                         current_speed = speed
@@ -73,11 +72,67 @@ def moveThread():
                 twist.linear.x = speed        
                 pub.publish(twist)
                         
+## 흰색선 검출
+def color_filter(image):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    lower = np.array([0,0,150])
+    upper = np.array([255,255,255])
+
+    yellow_lower = np.array([0, 85, 81])
+    yellow_upper = np.array([190, 255, 255])
+
+    yellow_mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
+    white_mask = cv2.inRange(hsv, lower, upper)
+    mask = cv2.bitwise_or(yellow_mask, white_mask)
+    masked = cv2.bitwise_and(image, image, mask=mask)
+    
+    return masked
+
+# 2번째 ROI 영역
+def region_of_interest(img,vertices):
+	mask = np.zeros_like(img)
+
+	if len(img.shape)>2 : 
+		channel_count =img.shape[2]
+		ignore_mask_color = (255,)*channel_count
+	else :
+		ignore_mask_color= 255
+
+	cv2.fillPoly(mask, vertices, ignore_mask_color)
+
+	masked_image = cv2.bitwise_and(img, mask)
+	return masked_image
+
+def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
+	lines_p = cv2.HoughLinesP(img, rho,theta, threshold,np.array([]),
+		minLineLength=min_line_len,
+		maxLineGap=max_line_gap)
+ 
+def sobel_xy(img, orient='x', thresh=(20, 100)):
+
+    if orient == 'x':
+        # dx=1, dy=0이면 x 방향의 편미분
+        abs_sobel = np.absolute(cv2.Sobel(img, cv2.CV_64F, 1, 0))
+    
+    if orient == 'y':
+        # dx=0, dy=1이면 y 방향의 편미분
+        abs_sobel = np.absolute(cv2.Sobel(img, cv2.CV_64F, 0, 1))
+    # Rescale back to 8 bit integer
+    scaled_sobel = np.uint8(255*abs_sobel/np.max(abs_sobel))
+    binary_output = np.zeros_like(scaled_sobel)
+    binary_output[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 255
+
+    # Return the result
+    return binary_output
+
+
         
 
 def image_callback(ros_image_compressed):
         try:
-                global tracker,EndFlag,trackerStopLine,start_flag,current_flag, traffic_flag
+                global tracker,StopLineFlag,trackerStopLine,GreenLightFlag
+                global box_x, box_y, box_w, box_h
                 np_arr = np.frombuffer(ros_image_compressed.data, np.uint8)
                 video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 video = cv2.resize(video,(640,480))
@@ -96,18 +151,12 @@ def image_callback(ros_image_compressed):
                         
                         tracker.init(video, TrafficRoi)
                         
-                if trackerStopLine is None:
-                        
-                        trackerStopLine = cv2.TrackerMIL_create()
-                        
-                        StopLineROI = (200,340,174,16)
-                        
-                        trackerStopLine.init(video, StopLineROI)
 
                 # 이미지 테스트, 분류 
                 
                 # 트랙커 설정
                 ret, TrafficROI = tracker.update(video)
+                cv2.rectangle(video, TrafficROI[:4], (0,0,255), 2)
                 
 
                 
@@ -121,22 +170,90 @@ def image_callback(ros_image_compressed):
                                         
                 TrafficHSV = cv2.cvtColor(TrafficImage,cv2.COLOR_BGR2HSV)
 
-                # 정지선 트랙커 설정
-                ret2 ,StopLineROI = trackerStopLine.update(video)                
+                # 정지선 처리 
                 
-                StopROI_x = StopLineROI[0]  
-                StopROI_y = StopLineROI[1]
-                StopROI_w = StopLineROI[2]
-                StopROI_h = StopLineROI[3]
+                height,width=video.shape[0:2]
+                x=width//2
+                y=(height*3)//4
+                ##################################
+                # 새로운 이미지를 생성하고 초기화합니다.
+                drawing = video
                 
+                # 2. gradient combine 
+                # Find lane lines with gradient information of Red channel
+                temp = video[y:height+1, 0:width+1] 
+
+                 # White Scale 영역만 나오게
+                color_filter_roi = color_filter(temp)
+                cv2.imshow('color_filter_roi', color_filter_roi)
                 
-                if video_h - (StopROI_y + StopROI_h)  < 5:
-                        EndFlag = 0
+                gray_roi = cv2.cvtColor(color_filter_roi, cv2.COLOR_BGR2GRAY)
                 
-                if EndFlag == 0:
-                        cv2.putText(video,"false",(216,377),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),2)
-                else:
-                        cv2.rectangle(video, StopLineROI[:4], (0,0,255), 2)
+                gray_img=cv2.cvtColor(temp, cv2.COLOR_BGR2GRAY)
+
+                # Gaussian 필터 적용
+                kernel_size = 5
+                blur_gray = cv2.GaussianBlur(gray_img, (kernel_size,kernel_size), 0)
+                
+                # Canny
+                low_threshold = 200
+                high_threshold = 255
+                edges = cv2.Canny(blur_gray, low_threshold, high_threshold)
+                
+                cv2.imshow('edges', edges)
+
+                # ROI .2
+                imshape = edges.shape
+                #print(imshape)
+                vertices = np.array([[(30, imshape[0]),
+                                (450, 320),
+                                (550, 320),
+                                (imshape[1]-20, imshape[0])]], dtype= np.int32)
+
+                mask = region_of_interest(edges, vertices)
+                #cv2.imshow('mask', mask)
+
+                # 선 그리기
+                rho = 2
+                theta = np.pi/180
+                threshold = 90
+                min_line_len = 120
+                max_line_gap = 150
+
+                lines = hough_lines(mask, rho, theta, threshold, min_line_len, max_line_gap)
+                
+                # Contours 찾기
+                # contours, hierarchy를 찾아냅니다.
+                contours, hierarchy = cv2.findContours(gray_roi, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                
+                for i, contour in enumerate(contours):
+                        area = cv2.contourArea(contour)
+                        rect = cv2.minAreaRect(contour)
+                        # 중심점 추출
+                        center = rect[0]
+                        #center[0]..x 305
+                        #center[1]..y
+                        if area > 1500 and 200<center[0]<400:
+
+                        # 무작위 색상 생성
+                                color = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
+
+                                # 윤곽선을 색으로 채워서 그립니다.
+                                box = cv2.boxPoints(rect).astype(np.int0)
+
+                                # 미네어리엑트 좌표를 이용하여 사각형 그리기
+                                box_x, box_y, box_w, box_h = cv2.boundingRect(contour)
+                                box_y += y
+                                hull = cv2.convexHull(contour)+(0,y)
+                        
+                                # 투명한 이미지 생성
+                                transparent_image = np.zeros((drawing.shape[0], drawing.shape[1], 3), dtype=np.uint8)
+                                cv2.drawContours(transparent_image, [hull], -1, (0, 255, 0), thickness=cv2.FILLED)
+                                drawing = cv2.addWeighted(drawing, 1, transparent_image, 0.4, 0)
+                        if box_w * box_h <8000:
+                                trackerStopLine = 1
+                                
+                        print(box_w * box_h)
                 cv2.imshow('frame', video)
                 
                 # 색 검출 과정 
@@ -179,23 +296,15 @@ def image_callback(ros_image_compressed):
 
                 for i, contour in enumerate(contours_red):
                         area_r = cv2.contourArea(contour)
-                        start_flag = 0
+                        GreenLightFlag = 0
                         
                 
                 for i, contour in enumerate(contours_green):
                         area_g = cv2.contourArea(contour)
-                        start_flag = 1
+                        GreenLightFlag = 1
                         
-                
-                if current_flag != start_flag:
-                        if start_flag == 0:
-                                print("red")
-                                traffic_flag = 1
-                        else:
-                                print("green")
-                                traffic_flag = 0
-                                
-                current_flag = start_flag
+        
+                         
                 # ESC를 누르면 종료
                 key = cv2.waitKey(1) & 0xFF
                 if (key == 27): 
@@ -211,12 +320,10 @@ if __name__ == '__main__':
         
         tracker = None
         trackerStopLine =None
-        EndFlag = 1
-        current_flag = 0
-        traffic_flag = 0
-        
+        StopLineFlag = 1
+        box_x= box_y= box_w= box_h = 0
         # 로봇 제어 전역변수 
-        start_flag = 1
+        GreenLightFlag = 1
         current_speed =0
  
         # 카메라 처리 
@@ -229,12 +336,10 @@ if __name__ == '__main__':
         pub = rospy.Publisher('cmd_vel', Twist, queue_size = 10)
         
         twist = Twist()
-
         twist.linear.x = twist.linear.y = twist.linear.z = 0
         twist.angular.x = twist.angular.y = twist.angular.z = 0
          
         pub.publish(twist)
-        
         
          # 로봇 제어 쓰레드 실행
         moveth = threading.Thread(target=moveThread)
