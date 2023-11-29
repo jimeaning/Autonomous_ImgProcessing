@@ -12,22 +12,15 @@ else:
 import cv2
 import numpy as np
 
-
-
-
-
 def getKey():
     
-    tty.setraw(sys.stdin.fileno())
-    rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
-    if rlist:
-        key = sys.stdin.read(1)
-    else:
-        key = ''
-    return key
-
-
-
+        tty.setraw(sys.stdin.fileno())
+        rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+        if rlist:
+                key = sys.stdin.read(1)
+        else:
+                key = ''
+        return key
         
 def moveThread():
         global  twist,pub,StopLineFlag, GreenLightFlag
@@ -74,20 +67,20 @@ def moveThread():
                         
 ## 흰색선 검출
 def color_filter(image):
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    lower = np.array([0,0,150])
-    upper = np.array([255,255,255])
+        lower = np.array([0,0,150])
+        upper = np.array([255,255,255])
 
-    yellow_lower = np.array([0, 85, 81])
-    yellow_upper = np.array([190, 255, 255])
+        yellow_lower = np.array([0, 85, 81])
+        yellow_upper = np.array([190, 255, 255])
 
-    yellow_mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
-    white_mask = cv2.inRange(hsv, lower, upper)
-    mask = cv2.bitwise_or(yellow_mask, white_mask)
-    masked = cv2.bitwise_and(image, image, mask=mask)
-    
-    return masked
+        yellow_mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
+        white_mask = cv2.inRange(hsv, lower, upper)
+        mask = cv2.bitwise_or(yellow_mask, white_mask)
+        masked = cv2.bitwise_and(image, image, mask=mask)
+        
+        return masked
 
 # 2번째 ROI 영역
 def region_of_interest(img,vertices):
@@ -111,59 +104,56 @@ def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
  
 def sobel_xy(img, orient='x', thresh=(20, 100)):
 
-    if orient == 'x':
-        # dx=1, dy=0이면 x 방향의 편미분
-        abs_sobel = np.absolute(cv2.Sobel(img, cv2.CV_64F, 1, 0))
-    
-    if orient == 'y':
-        # dx=0, dy=1이면 y 방향의 편미분
-        abs_sobel = np.absolute(cv2.Sobel(img, cv2.CV_64F, 0, 1))
-    # Rescale back to 8 bit integer
-    scaled_sobel = np.uint8(255*abs_sobel/np.max(abs_sobel))
-    binary_output = np.zeros_like(scaled_sobel)
-    binary_output[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 255
-
-    # Return the result
-    return binary_output
-
-
+        if orient == 'x':
+                # dx=1, dy=0이면 x 방향의 편미분
+                abs_sobel = np.absolute(cv2.Sobel(img, cv2.CV_64F, 1, 0))
         
+        if orient == 'y':
+                # dx=0, dy=1이면 y 방향의 편미분
+                abs_sobel = np.absolute(cv2.Sobel(img, cv2.CV_64F, 0, 1))
+        # Rescale back to 8 bit integer
+        scaled_sobel = np.uint8(255*abs_sobel/np.max(abs_sobel))
+        binary_output = np.zeros_like(scaled_sobel)
+        binary_output[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 255
+
+        # Return the result
+        return binary_output
 
 def image_callback(ros_image_compressed):
         try:
-                global tracker,StopLineFlag,trackerStopLine,GreenLightFlag
+                global tracker,StopLineFlag,GreenLightFlag
                 global box_x, box_y, box_w, box_h
                 np_arr = np.frombuffer(ros_image_compressed.data, np.uint8)
                 video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 video = cv2.resize(video,(640,480))
                 video_h,video_w,video_c = video.shape 
 
-                video = cv2.rotate(video, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                #video = cv2.rotate(video, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                StopVideo = video.copy()
 
                 if tracker is None:
                         tracker = cv2.TrackerMIL_create()
                         x = 130
-                        y = 190
+                        y = 130
                         w = 270
                         h = 50
                         
                         TrafficRoi = (x,y,w,h)
                         
-                        tracker.init(video, TrafficRoi)
-                        
+                        tracker.init(video, TrafficRoi)                       
 
                 # 이미지 테스트, 분류 
                 
                 # 트랙커 설정
-                ret, TrafficROI = tracker.update(video)
-                cv2.rectangle(video, TrafficROI[:4], (0,0,255), 2)
+                ret, TrafficROi = tracker.update(video)
+                cv2.rectangle(video, TrafficROi[:4], (0,0,255), 2)
                 
 
                 
-                ROI_x = TrafficROI[0]
-                ROI_y = TrafficROI[1]
-                ROI_w = TrafficROI[2]
-                ROI_h = TrafficROI[3]
+                ROI_x = TrafficROi[0]
+                ROI_y = TrafficROi[1]
+                ROI_w = TrafficROi[2]
+                ROI_h = TrafficROi[3]
 
                 TrafficImage = video[ROI_y:ROI_y + ROI_h, 
                                         ROI_x:ROI_x + ROI_w]
@@ -172,23 +162,22 @@ def image_callback(ros_image_compressed):
 
                 # 정지선 처리 
                 
-                height,width=video.shape[0:2]
+                height,width=StopVideo.shape[0:2]
                 x=width//2
-                y=(height*3)//4
-                ##################################
+                y=(height*3)//6
+
                 # 새로운 이미지를 생성하고 초기화합니다.
-                drawing = video
+                drawing = StopVideo
                 
                 # 2. gradient combine 
                 # Find lane lines with gradient information of Red channel
-                temp = video[y:height+1, 0:width+1] 
+                temp = StopVideo[y:height+1, 0:width+1] 
 
                  # White Scale 영역만 나오게
                 color_filter_roi = color_filter(temp)
                 cv2.imshow('color_filter_roi', color_filter_roi)
                 
                 gray_roi = cv2.cvtColor(color_filter_roi, cv2.COLOR_BGR2GRAY)
-                
                 gray_img=cv2.cvtColor(temp, cv2.COLOR_BGR2GRAY)
 
                 # Gaussian 필터 적용
@@ -196,12 +185,14 @@ def image_callback(ros_image_compressed):
                 blur_gray = cv2.GaussianBlur(gray_img, (kernel_size,kernel_size), 0)
                 
                 # Canny
-                low_threshold = 200
+                low_threshold = 50
                 high_threshold = 255
                 edges = cv2.Canny(blur_gray, low_threshold, high_threshold)
                 
                 cv2.imshow('edges', edges)
-
+                k = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
+                close_filter = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, k)
+                cv2.imshow('close', close_filter)
                 # ROI .2
                 imshape = edges.shape
                 #print(imshape)
@@ -221,23 +212,23 @@ def image_callback(ros_image_compressed):
                 max_line_gap = 150
 
                 lines = hough_lines(mask, rho, theta, threshold, min_line_len, max_line_gap)
-                
+
                 # Contours 찾기
                 # contours, hierarchy를 찾아냅니다.
                 contours, hierarchy = cv2.findContours(gray_roi, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 
                 for i, contour in enumerate(contours):
                         area = cv2.contourArea(contour)
+                        # print(area)
                         rect = cv2.minAreaRect(contour)
                         # 중심점 추출
                         center = rect[0]
                         #center[0]..x 305
                         #center[1]..y
-                        if area > 1500 and 200<center[0]<400:
+                        if area > 1200 and 200<center[0]<400:
 
                         # 무작위 색상 생성
                                 color = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
-
                                 # 윤곽선을 색으로 채워서 그립니다.
                                 box = cv2.boxPoints(rect).astype(np.int0)
 
@@ -250,11 +241,12 @@ def image_callback(ros_image_compressed):
                                 transparent_image = np.zeros((drawing.shape[0], drawing.shape[1], 3), dtype=np.uint8)
                                 cv2.drawContours(transparent_image, [hull], -1, (0, 255, 0), thickness=cv2.FILLED)
                                 drawing = cv2.addWeighted(drawing, 1, transparent_image, 0.4, 0)
-                        if box_w * box_h <8000:
-                                trackerStopLine = 1
-                                
-                        print(box_w * box_h)
-                cv2.imshow('frame', video)
+
+                                if box_w * box_h < 2000:
+                                        StopLineFlag = 0 
+                                        print(box_w * box_h)
+                             
+                cv2.imshow('stopline', drawing)
                 
                 # 색 검출 과정 
                 # 초록색
@@ -303,7 +295,7 @@ def image_callback(ros_image_compressed):
                         area_g = cv2.contourArea(contour)
                         GreenLightFlag = 1
                         
-        
+                cv2.imshow('traffic_light', video)
                          
                 # ESC를 누르면 종료
                 key = cv2.waitKey(1) & 0xFF
@@ -313,14 +305,11 @@ def image_callback(ros_image_compressed):
         except CvBridgeError as e:
                 print("Error")
 
-
-
-
+## MAIN
 if __name__ == '__main__':
         
         tracker = None
-        trackerStopLine =None
-        StopLineFlag = 1
+        StopLineFlag = 1        # 정지선 포착
         box_x= box_y= box_w= box_h = 0
         # 로봇 제어 전역변수 
         GreenLightFlag = 1
@@ -338,7 +327,7 @@ if __name__ == '__main__':
         twist = Twist()
         twist.linear.x = twist.linear.y = twist.linear.z = 0
         twist.angular.x = twist.angular.y = twist.angular.z = 0
-         
+        
         pub.publish(twist)
         
          # 로봇 제어 쓰레드 실행
