@@ -133,9 +133,9 @@ def image_callback(ros_image_compressed):
 
                 if tracker is None:
                         tracker = cv2.TrackerMIL_create()
-                        x = 130
-                        y = 130
-                        w = 270
+                        x = 200
+                        y = 100
+                        w = 200
                         h = 50
                         
                         TrafficRoi = (x,y,w,h)
@@ -288,20 +288,27 @@ def image_callback(ros_image_compressed):
 
                 for i, contour in enumerate(contours_red):
                         area_r = cv2.contourArea(contour)
-                        GreenLightFlag = 0
                         
                 
                 for i, contour in enumerate(contours_green):
                         area_g = cv2.contourArea(contour)
-                        GreenLightFlag = 1
                         
+                
+
+                if area_r>1000:
+                        GreenLightFlag = 0
+
+                if area_g>1000:
+                        GreenLightFlag = 1
+
                 cv2.imshow('traffic_light', video)
-                         
                 # ESC를 누르면 종료
                 key = cv2.waitKey(1) & 0xFF
                 if (key == 27): 
                         exit()
                 
+                print("area_r",area_r)
+                print("area_g",area_g)
         except CvBridgeError as e:
                 print("Error")
 
