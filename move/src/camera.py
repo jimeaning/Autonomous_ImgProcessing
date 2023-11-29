@@ -52,7 +52,6 @@ def moveThread():
                         elif GreenLightFlag == 0:
                                 if StopLineFlag == 0:
                                         print("빨간색 그리고 정지선")
-                                        time.sleep(1)
                                         speed = 0
                                 else:
                                         print("빨간색")
@@ -129,12 +128,11 @@ def image_callback(ros_image_compressed):
                 video_h,video_w,video_c = video.shape 
 
                 #video = cv2.rotate(video, cv2.ROTATE_90_COUNTERCLOCKWISE)
-                StopVideo = video.copy()
 
                 if tracker is None:
                         tracker = cv2.TrackerMIL_create()
                         x = 200
-                        y = 100
+                        y = 140
                         w = 200
                         h = 50
                         
@@ -162,20 +160,19 @@ def image_callback(ros_image_compressed):
 
                 # 정지선 처리 
                 
-                height,width=StopVideo.shape[0:2]
+                height,width=video.shape[0:2]
                 x=width//2
                 y=(height*3)//6
 
                 # 새로운 이미지를 생성하고 초기화합니다.
-                drawing = StopVideo
+                drawing = video
                 
                 # 2. gradient combine 
                 # Find lane lines with gradient information of Red channel
-                temp = StopVideo[y:height+1, 0:width+1] 
+                temp = video[y:height+1, 0:width+1] 
 
                  # White Scale 영역만 나오게
                 color_filter_roi = color_filter(temp)
-                cv2.imshow('color_filter_roi', color_filter_roi)
                 
                 gray_roi = cv2.cvtColor(color_filter_roi, cv2.COLOR_BGR2GRAY)
                 gray_img=cv2.cvtColor(temp, cv2.COLOR_BGR2GRAY)
@@ -189,20 +186,16 @@ def image_callback(ros_image_compressed):
                 high_threshold = 255
                 edges = cv2.Canny(blur_gray, low_threshold, high_threshold)
                 
-                cv2.imshow('edges', edges)
                 k = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
                 close_filter = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, k)
-                cv2.imshow('close', close_filter)
                 # ROI .2
                 imshape = edges.shape
-                #print(imshape)
                 vertices = np.array([[(30, imshape[0]),
                                 (450, 320),
                                 (550, 320),
                                 (imshape[1]-20, imshape[0])]], dtype= np.int32)
 
                 mask = region_of_interest(edges, vertices)
-                #cv2.imshow('mask', mask)
 
                 # 선 그리기
                 rho = 2
@@ -216,6 +209,7 @@ def image_callback(ros_image_compressed):
                 # Contours 찾기
                 # contours, hierarchy를 찾아냅니다.
                 contours, hierarchy = cv2.findContours(gray_roi, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                roi_h = gray_roi.shape[0]
                 
                 for i, contour in enumerate(contours):
                         area = cv2.contourArea(contour)
@@ -225,8 +219,8 @@ def image_callback(ros_image_compressed):
                         center = rect[0]
                         #center[0]..x 305
                         #center[1]..y
-                        if area > 1200 and 200<center[0]<400:
-
+                        if area > 2000 and 200<center[0]<400:
+                        
                         # 무작위 색상 생성
                                 color = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
                                 # 윤곽선을 색으로 채워서 그립니다.
@@ -242,13 +236,10 @@ def image_callback(ros_image_compressed):
                                 cv2.drawContours(transparent_image, [hull], -1, (0, 255, 0), thickness=cv2.FILLED)
                                 drawing = cv2.addWeighted(drawing, 1, transparent_image, 0.4, 0)
 
-                                if box_w * box_h < 2000:
+                                if roi_h * 6//7 < center[1]: 
                                         StopLineFlag = 0 
-                                        print(box_w * box_h)
-                             
-                cv2.imshow('stopline', drawing)
-                
-                # 색 검출 과정 
+                                        print(center[1])
+                # 색 검출 과정    
                 # 초록색
                 lower_green = np.array([36,30,30])
                 higher_green = np.array([83,255,255])
@@ -295,20 +286,19 @@ def image_callback(ros_image_compressed):
                         
                 
 
-                if area_r>1000:
+                if area_r>50:
                         GreenLightFlag = 0
 
-                if area_g>1000:
+                if area_g>50:
                         GreenLightFlag = 1
 
-                cv2.imshow('traffic_light', video)
+                
+                cv2.imshow('traffic_light', drawing)
                 # ESC를 누르면 종료
                 key = cv2.waitKey(1) & 0xFF
                 if (key == 27): 
                         exit()
-                
-                print("area_r",area_r)
-                print("area_g",area_g)
+                        
         except CvBridgeError as e:
                 print("Error")
 
