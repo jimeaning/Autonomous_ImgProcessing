@@ -50,9 +50,11 @@ Python, OpneCV, ROS1 Noetic , Ubuntu 20.04
 
 
 
-## 하드웨어 구현
+## 개발 방법론
+**애자일 소프트웨어 개발 방식**
+### 제품 백로그/스프린트 백로그
+![](https://github.com/exitdoor4/Autonomous/assets/74641060/0557bddd-33fb-45e5-9c5d-9da862d3a1bc)
 
-![](https://github.com/exitdoor4/Autonomous/assets/74641060/82bfab46-c72e-4019-b7a6-62bdb5a14fc0)
 
 <br>
 
